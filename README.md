@@ -1,6 +1,6 @@
 # little scripts 📜
 
-## photo-query
+## remove-orphaned-live-photo-videos
 
 Dependencies:
 
