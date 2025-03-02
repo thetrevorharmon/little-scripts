@@ -9,13 +9,6 @@ const RAW_VIDEOS_METADATA = `${CACHE_DIRECTORY}/videos.txt`;
 const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
 const MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/matching-videos-uuids.txt`;
 const NON_MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/non-matching-videos-uuids.txt`;
-// osxphotos query --only-movies --min-size 200MB --add-to-album "Big Videos"
-
-// --uuid <UUID>
-// Search for photos with UUID(s). May be repeated to include multiple UUIDs.
-
-// --uuid-from-file <FILE>
-// Search for photos with UUID(s) loaded from FILE. Format is a single UUID per line. Lines preceded with # are ignored. If FILE is ' -', read UUIDs from stdin.
 
 // The sizes here are a bit arbitrary, they might need to be adjusted accordingly
 const QUERIES = {
