@@ -5,10 +5,15 @@ const DATE_OF_LIVE_PHOTOS_START = '2016-11-01';
 
 const CACHE_DIRECTORY =
   '.cache/little-scripts/remove-orphaned-live-photo-videos';
-const RAW_VIDEOS_METADATA = `${CACHE_DIRECTORY}/videos.txt`;
-const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
-const MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/matching-videos-uuids.txt`;
-const NON_MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/non-matching-videos-uuids.txt`;
+const RAW_VIDEOS_METADATA_PATH = `${CACHE_DIRECTORY}/videos.txt`;
+const RAW_PHOTOS_METADATA_PATH = `${CACHE_DIRECTORY}/photos.txt`;
+const MATCHING_VIDEOS_UUIDS_PATH = `${CACHE_DIRECTORY}/matching-videos-uuids.txt`;
+const NON_MATCHING_VIDEOS_UUIDS_PATH = `${CACHE_DIRECTORY}/non-matching-videos-uuids.txt`;
+
+const ALBUMS = {
+  MATCHING_VIDEOS: 'Orphaned videos',
+  NON_MATCHING_VIDEOS: 'Small videos that might be orphaned',
+};
 
 // The sizes here are a bit arbitrary, they might need to be adjusted accordingly
 const QUERIES = {
@@ -39,18 +44,18 @@ const QUERIES = {
     'query',
     '--only-movies',
     '--uuid-from-file',
-    `${MATCHING_VIDEOS_UUIDS}`,
+    `${MATCHING_VIDEOS_UUIDS_PATH}`,
     '--add-to-album',
-    'Orphaned videos',
+    ALBUMS.MATCHING_VIDEOS,
   ],
   // Add all of the non-matching videos to the "Orphaned videos" album
   addNonMatchingVideosToAlbum: [
     'query',
     '--only-movies',
     '--uuid-from-file',
-    `${NON_MATCHING_VIDEOS_UUIDS}`,
+    `${NON_MATCHING_VIDEOS_UUIDS_PATH}`,
     '--add-to-album',
-    'Small videos that might be orphaned',
+    ALBUMS.NON_MATCHING_VIDEOS,
   ],
 };
 
@@ -109,6 +114,7 @@ const Spinner = new (class {
 
 async function ensureCacheDirectoryExists() {
   console.log('⏳ Ensuring cache directory exists...');
+
   try {
     fs.mkdirSync(CACHE_DIRECTORY, { recursive: true });
     console.log('✅ Cache directory created');
@@ -127,7 +133,7 @@ async function loadVideoMetadata() {
   console.log('🔎 Looking for cached videos metadata...');
 
   try {
-    const rawVideoMetadata = fs.readFileSync(RAW_VIDEOS_METADATA, 'utf8');
+    const rawVideoMetadata = fs.readFileSync(RAW_VIDEOS_METADATA_PATH, 'utf8');
     const videoMetadata = JSON.parse(rawVideoMetadata);
     console.log('✅ Loaded video metadata');
     return videoMetadata;
@@ -137,8 +143,8 @@ async function loadVideoMetadata() {
     const result = await spawnCommand('osxphotos', QUERIES.videoMetadata);
     console.log('📹 Queried video metadata');
 
-    fs.writeFileSync(RAW_VIDEOS_METADATA, result);
-    console.log(`📁 Wrote results to ${RAW_VIDEOS_METADATA}`);
+    fs.writeFileSync(RAW_VIDEOS_METADATA_PATH, result);
+    console.log(`📁 Wrote results to ${RAW_VIDEOS_METADATA_PATH}`);
 
     const videoMetadata = JSON.parse(result);
     console.log('✅ Loaded video metadata');
@@ -150,7 +156,7 @@ async function loadPhotoMetadata() {
   console.log('🔎 Looking for cached photos metadata...');
 
   try {
-    const rawPhotoMetadata = fs.readFileSync(RAW_PHOTOS_METADATA, 'utf8');
+    const rawPhotoMetadata = fs.readFileSync(RAW_PHOTOS_METADATA_PATH, 'utf8');
     const photoMetadata = JSON.parse(rawPhotoMetadata);
     console.log('✅ Loaded photo metadata');
     return photoMetadata;
@@ -160,8 +166,8 @@ async function loadPhotoMetadata() {
     const result = await spawnCommand('osxphotos', QUERIES.photoMetadata);
     console.log('📸 Queried photo metadata');
 
-    fs.writeFileSync(RAW_PHOTOS_METADATA, result);
-    console.log(`📁 Wrote results to ${RAW_PHOTOS_METADATA}`);
+    fs.writeFileSync(RAW_PHOTOS_METADATA_PATH, result);
+    console.log(`📁 Wrote results to ${RAW_PHOTOS_METADATA_PATH}`);
 
     const photoMetadata = JSON.parse(result);
     console.log('✅ Loaded photo metadata');
@@ -170,36 +176,37 @@ async function loadPhotoMetadata() {
 }
 
 function simplifyMetadata(metadata, type) {
-  if ('exif_info' in metadata[0]) {
-    console.log(`⏳ Simplifying ${type} metadata...`);
-
-    const simplified = metadata.map((item) => ({
-      uuid: item.uuid,
-      date: item.date,
-      original_filename: item.original_filename,
-      filename: item.filename,
-      type,
-    }));
-
-    const outputFile =
-      type === 'video' ? RAW_VIDEOS_METADATA : RAW_PHOTOS_METADATA;
-    fs.writeFileSync(outputFile, JSON.stringify(simplified, null, 2));
-    console.log(`✅ Wrote results to ${outputFile}`);
-
-    return simplified;
+  if (!('exif_info' in metadata[0])) {
+    return metadata;
   }
 
-  return metadata;
+  console.log(`⏳ Simplifying ${type} metadata...`);
+
+  const simplified = metadata.map((item) => ({
+    uuid: item.uuid,
+    date: item.date,
+    original_filename: item.original_filename,
+    filename: item.filename,
+    type,
+  }));
+
+  const outputFile =
+    type === 'video' ? RAW_VIDEOS_METADATA_PATH : RAW_PHOTOS_METADATA_PATH;
+
+  fs.writeFileSync(outputFile, JSON.stringify(simplified, null, 2));
+  console.log(`✅ Wrote results to ${outputFile}`);
+
+  return simplified;
 }
 
 async function findMatchingVideos(videoMetadata, photoMetadata) {
   console.log('🔎 Finding matching videos and photos...');
 
   try {
-    fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
+    fs.readFileSync(MATCHING_VIDEOS_UUIDS_PATH, 'utf8');
     console.log('✅ Matching videos UUIDs already generated');
 
-    fs.readFileSync(NON_MATCHING_VIDEOS_UUIDS, 'utf8');
+    fs.readFileSync(NON_MATCHING_VIDEOS_UUIDS_PATH, 'utf8');
     console.log('✅ Non-matching videos UUIDs already generated');
   } catch {
     console.log('❌ Missing a videos uuids file');
@@ -246,15 +253,18 @@ async function findMatchingVideos(videoMetadata, photoMetadata) {
     const nonMatchingVideosUuids = nonMatchingVideos.map((video) => video.uuid);
 
     console.log('⏳ Writing matching videos uuids to file...');
-    fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
-    console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
+    fs.writeFileSync(
+      MATCHING_VIDEOS_UUIDS_PATH,
+      matchingVideosUuids.join('\n')
+    );
+    console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS_PATH}`);
 
     console.log('⏳ Writing non-matching videos uuids to file...');
     fs.writeFileSync(
-      NON_MATCHING_VIDEOS_UUIDS,
+      NON_MATCHING_VIDEOS_UUIDS_PATH,
       nonMatchingVideosUuids.join('\n')
     );
-    console.log(`✅ Wrote results to ${NON_MATCHING_VIDEOS_UUIDS}`);
+    console.log(`✅ Wrote results to ${NON_MATCHING_VIDEOS_UUIDS_PATH}`);
   }
 }
 
