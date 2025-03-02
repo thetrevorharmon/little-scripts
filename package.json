@@ -1,0 +1,8 @@
+{
+  "name": "little-scripts",
+  "version": "0.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/thetrevorharmon/little-scripts",
+  "author": "Trevor Harmon <thetrevorharmon@gmail.com>",
+  "license": "MIT"
+}
