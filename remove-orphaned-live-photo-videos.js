@@ -48,7 +48,7 @@ const QUERIES = {
     '--uuid-from-file',
     `${MATCHING_VIDEOS_UUIDS}`,
     '--add-to-album',
-    '"Orphaned videos"',
+    'Orphaned videos',
   ],
   // Add all of the non-matching videos to the "Orphaned videos" album
   addNonMatchingVideosToAlbum: [
@@ -57,7 +57,7 @@ const QUERIES = {
     '--uuid-from-file',
     `${NON_MATCHING_VIDEOS_UUIDS}`,
     '--add-to-album',
-    '"Orphaned videos - no photo match"',
+    'Small videos that might be orphaned',
   ],
 };
 
@@ -91,7 +91,7 @@ async function spawnCommand(requestedCommand, args) {
 }
 
 function stripExtension(filename) {
-  return filename.replace(/\.[^/.]+$/, '');
+  return filename.replace(/(\(\d+\))*\.[^/.]+$/, '');
 }
 
 async function main() {
