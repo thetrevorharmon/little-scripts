@@ -4,5 +4,13 @@
   "main": "index.js",
   "repository": "https://github.com/thetrevorharmon/little-scripts",
   "author": "Trevor Harmon <thetrevorharmon@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "photo-query": "node photo-query.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.5.2"
+  }
 }
