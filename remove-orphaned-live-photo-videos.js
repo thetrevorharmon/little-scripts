@@ -290,6 +290,11 @@ async function main() {
 
     await findMatchingVideos(videoMetadata, photoMetadata);
     await addVideosToAlbums();
+
+    // TODO:
+    // there are far fewer videos in the "maybe" album than the printout indicates that there should be
+    // need to add a validation step that looks at the albums and compares the UUIDs of the album to what we have
+    // in the cache, and see how to address the discrepancy
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
