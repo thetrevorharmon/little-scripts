@@ -63,6 +63,12 @@ function spawnCommand(command, args) {
         reject(new Error(`Command failed with code ${code}`));
       }
     });
+
+    // This is a bit of a hack to get the output of the command
+    // to be overwritten on the same line. That way it is a little tidier
+    command.stdout.on('data', (data) => {
+      process.stdout.write(`\r${data.toString().trim()}   `);
+    });
   });
 }
 
