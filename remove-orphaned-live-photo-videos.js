@@ -8,7 +8,7 @@ const CACHE_DIRECTORY =
 const RAW_VIDEOS_METADATA = `${CACHE_DIRECTORY}/videos.txt`;
 const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
 const MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/matching-videos-uuids.txt`;
-
+const NON_MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/non-matching-videos-uuids.txt`;
 // osxphotos query --only-movies --min-size 200MB --add-to-album "Big Videos"
 
 // --uuid <UUID>
@@ -42,17 +42,26 @@ const QUERIES = {
     '--json',
   ],
   // Add all of the matching videos to the "Orphaned videos" album
-  addVideosToAlbum: [
+  addMatchingVideosToAlbum: [
     'query',
     '--only-movies',
     '--uuid-from-file',
-    `"${MATCHING_VIDEOS_UUIDS}"`,
+    `${MATCHING_VIDEOS_UUIDS}`,
     '--add-to-album',
     '"Orphaned videos"',
   ],
+  // Add all of the non-matching videos to the "Orphaned videos" album
+  addNonMatchingVideosToAlbum: [
+    'query',
+    '--only-movies',
+    '--uuid-from-file',
+    `${NON_MATCHING_VIDEOS_UUIDS}`,
+    '--add-to-album',
+    '"Orphaned videos - no photo match"',
+  ],
 };
 
-function spawnCommand(requestedCommand, args) {
+async function spawnCommand(requestedCommand, args) {
   return new Promise((resolve, reject) => {
     let output = '';
 
@@ -196,20 +205,29 @@ async function main() {
       fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
 
       console.log('✅ Matching videos UUIDs already generated');
+
+      fs.readFileSync(NON_MATCHING_VIDEOS_UUIDS, 'utf8');
+
+      console.log('✅ Non-matching videos UUIDs already generated');
     } catch {
-      console.log('❌ No matching videos uuids file found, creating...');
+      console.log('❌ Missing a videos uuids file, generating...');
 
-      process.stdout.write(`Searching... 0%\r`);
+      process.stdout.write(`🔎 Matching videos to photos... 0%\r`);
 
-      const matchingVideos = videoMetadata.filter((video, index) => {
+      const matchingVideos = [];
+      const nonMatchingVideos = [];
+
+      videoMetadata.forEach((video, index) => {
         const percentComplete = Math.min(
           Math.round((index / photoMetadata.length) * 100 * 10) / 10,
           99.9
         );
 
-        process.stdout.write(`\rSearching... ${percentComplete}%      \r`);
+        process.stdout.write(
+          `\r🔎 Matching videos to photos... ${percentComplete}%      \r`
+        );
 
-        return photoMetadata.some((photo) => {
+        const hasMatch = photoMetadata.some((photo) => {
           // Parse dates to YYYY-MM-DD format for comparison
           const photoDate = photo.date.split('T')[0];
           const videoDate = video.date.split('T')[0];
@@ -220,31 +238,50 @@ async function main() {
 
           return photoDate === videoDate && photoFilename === videoFilename;
         });
+
+        if (hasMatch) {
+          matchingVideos.push(video);
+        } else {
+          nonMatchingVideos.push(video);
+        }
       });
 
-      if (matchingVideos.length === 0) {
-        console.log('❌ No matching videos and photos found');
-        process.exit(0);
-      }
-
-      console.log(`📹 Found ${matchingVideos.length} matching videos`);
-      console.log(matchingVideos);
+      console.log(
+        `📹 Found ${matchingVideos.length} matching videos, ${nonMatchingVideos.length} non-matching videos`
+      );
 
       const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
+      const nonMatchingVideosUuids = nonMatchingVideos.map(
+        (video) => video.uuid
+      );
 
       console.log('⏳ Writing matching videos uuids to file...');
 
       fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
 
       console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
+
+      console.log('⏳ Writing non-matching videos uuids to file...');
+
+      fs.writeFileSync(
+        NON_MATCHING_VIDEOS_UUIDS,
+        nonMatchingVideosUuids.join('\n')
+      );
+
+      console.log(`✅ Wrote results to ${NON_MATCHING_VIDEOS_UUIDS}`);
     }
 
     console.log('🔎 Adding matching videos to album...');
 
-    // const result = await spawnCommand('osxphotos', QUERIES.addVideosToAlbum);
+    await spawnCommand('osxphotos', QUERIES.addMatchingVideosToAlbum);
 
     console.log('✅ Added matching videos to album');
-    console.log(result);
+
+    console.log('🔎 Adding non-matching videos to album...');
+
+    await spawnCommand('osxphotos', QUERIES.addNonMatchingVideosToAlbum);
+
+    console.log('✅ Added non-matching videos to album');
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
