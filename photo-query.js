@@ -1,5 +1,39 @@
+const DATE_OF_LIVE_PHOTOS_START = '2016-11-01';
+
 const WORKING_COPY_DIRECTORY = '_scratch/photo-query';
 const SMALL_VIDEOS_DUMP_FILE_PATH = `${WORKING_COPY_DIRECTORY}/small-videos-dump.txt`;
+const PHOTOS_MAYBE_CORRESPONDING_TO_SMALL_VIDEOS_DUMP_FILE_PATH = `${WORKING_COPY_DIRECTORY}/photos-maybe-corresponding-to-small-videos-dump.txt`;
+
+// osxphotos query --only-movies --min-size 200MB --add-to-album "Big Videos"
+
+// --uuid <UUID>
+// Search for photos with UUID(s). May be repeated to include multiple UUIDs.
+
+// --uuid-from-file <FILE>
+// Search for photos with UUID(s) loaded from FILE. Format is a single UUID per line. Lines preceded with # are ignored. If FILE is ‘-’, read UUIDs from stdin.
+
+const QUERIES = {
+  smallVideos: [
+    'query',
+    '--only-movies',
+    '--max-size',
+    // 7mb in bytes
+    '7340032',
+    '--from-date',
+    DATE_OF_LIVE_PHOTOS_START,
+    '--json',
+  ],
+  photosMaybeCorrespondingToSmallVideos: [
+    'query',
+    '--only-photos',
+    '--max-size',
+    // 15mb in bytes
+    '15728640',
+    '--from-date',
+    DATE_OF_LIVE_PHOTOS_START,
+    '--json',
+  ],
+};
 
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -63,6 +97,34 @@ async function main() {
       smallVideosJsonDump = result;
     }
 
+    let photosMaybeCorrespondingToSmallVideosJsonDump;
+
+    try {
+      photosMaybeCorrespondingToSmallVideosJsonDump = fs.readFileSync(
+        PHOTOS_MAYBE_CORRESPONDING_TO_SMALL_VIDEOS_DUMP_FILE_PATH,
+        'utf8'
+      );
+    } catch (error) {
+      // no valid existing dump
+    }
+
+    if (photosMaybeCorrespondingToSmallVideosJsonDump == null) {
+      const result = await spawnCommand('osxphotos', [
+        'query',
+        '--only-photos',
+        '--max-size',
+        '15728640',
+        '--json',
+      ]);
+
+      fs.writeFileSync(
+        PHOTOS_MAYBE_CORRESPONDING_TO_SMALL_VIDEOS_DUMP_FILE_PATH,
+        result
+      );
+
+      photosMaybeCorrespondingToSmallVideosJsonDump = result;
+    }
+
     const smallVideos = JSON.parse(smallVideosJsonDump).map((video) => ({
       uuid: video.uuid,
       originalDate: video.date_original,
@@ -72,6 +134,7 @@ async function main() {
     }));
 
     console.log(smallVideos[0]);
+    console.log(photosMaybeCorrespondingToSmallVideos[0]);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
