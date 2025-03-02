@@ -1,3 +1,6 @@
+const { spawn } = require('child_process');
+const fs = require('fs');
+
 const DATE_OF_LIVE_PHOTOS_START = '2016-11-01';
 
 const CACHE_DIRECTORY =
@@ -11,7 +14,7 @@ const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
 // Search for photos with UUID(s). May be repeated to include multiple UUIDs.
 
 // --uuid-from-file <FILE>
-// Search for photos with UUID(s) loaded from FILE. Format is a single UUID per line. Lines preceded with # are ignored. If FILE is ‘-’, read UUIDs from stdin.
+// Search for photos with UUID(s) loaded from FILE. Format is a single UUID per line. Lines preceded with # are ignored. If FILE is ' -', read UUIDs from stdin.
 
 // The sizes here are a bit arbitrary, they might need to be adjusted accordingly
 const QUERIES = {
@@ -39,9 +42,6 @@ const QUERIES = {
   ],
 };
 
-const { spawn } = require('child_process');
-const fs = require('fs');
-
 function spawnCommand(command, args) {
   return new Promise((resolve, reject) => {
     let output = '';
@@ -49,7 +49,6 @@ function spawnCommand(command, args) {
 
     process.stdout.on('data', (data) => {
       output += data;
-      console.log(data.toString()); // Show output in real-time
     });
 
     process.stderr.on('data', (data) => {
@@ -66,11 +65,30 @@ function spawnCommand(command, args) {
   });
 }
 
+function stripExtension(filename) {
+  return filename.replace(/\.[^/.]+$/, '');
+}
+
 async function main() {
   let videoMetadata, photoMetadata;
 
+  console.log('🔎 Ensuring cache directory exists...');
+  try {
+    fs.mkdirSync(CACHE_DIRECTORY, { recursive: true });
+    console.log('✅ Cache directory created');
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      // Directory already exists - this is fine!
+      console.log('✅ Cache directory already exists');
+    } else {
+      // Some other error occurred (permissions, disk full, etc) - this is bad!
+      throw error;
+    }
+  }
+
   try {
     console.log('🔎 Looking for cached videos metadata...');
+
     try {
       rawVideoMetadata = fs.readFileSync(RAW_VIDEOS_METADATA, 'utf8');
       videoMetadata = JSON.parse(rawVideoMetadata);
@@ -81,10 +99,11 @@ async function main() {
 
       const result = await spawnCommand('osxphotos', QUERIES.videoMetadata);
 
-      // Write the result to output.ts, overwriting if it exists
+      console.log('📹 Queried video metadata');
+
       fs.writeFileSync(RAW_VIDEOS_METADATA, result);
 
-      console.log(`📁 Successfully wrote results to ${RAW_VIDEOS_METADATA}`);
+      console.log(`📁 Wrote results to ${RAW_VIDEOS_METADATA}`);
 
       videoMetadata = JSON.parse(result);
 
@@ -92,6 +111,7 @@ async function main() {
     }
 
     console.log('🔎 Looking for cached photos metadata...');
+
     try {
       rawPhotoMetadata = fs.readFileSync(RAW_PHOTOS_METADATA, 'utf8');
 
@@ -103,17 +123,35 @@ async function main() {
 
       const result = await spawnCommand('osxphotos', QUERIES.photoMetadata);
 
+      console.log('📸 Queried photo metadata');
+
       fs.writeFileSync(RAW_PHOTOS_METADATA, result);
 
-      console.log(`📁 Successfully wrote results to ${RAW_PHOTOS_METADATA}`);
+      console.log(`📁 Wrote results to ${RAW_PHOTOS_METADATA}`);
 
       photoMetadata = JSON.parse(result);
 
       console.log('✅ Loaded photo metadata');
     }
 
-    console.log(videoMetadata[0]);
-    console.log(photoMetadata[0]);
+    console.log('🔎 Finding matching videos and photos...');
+
+    const matchingVideos = videoMetadata.filter((video) => {
+      return photoMetadata.some((photo) => {
+        return (
+          photo.date === video.date &&
+          stripExtension(photo.original_filename) ===
+            stripExtension(video.original_filename)
+        );
+      });
+    });
+
+    if (matchingVideos.length === 0) {
+      console.log('❌ No matching videos and photos found');
+    } else {
+      console.log(`📹 Found ${matchingVideos.length} matching videos`);
+      console.log(matchingVideos);
+    }
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
