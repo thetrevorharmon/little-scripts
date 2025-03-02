@@ -41,33 +41,42 @@ const QUERIES = {
     DATE_OF_LIVE_PHOTOS_START,
     '--json',
   ],
+  // Add all of the matching videos to the "Orphaned videos" album
+  addVideosToAlbum: [
+    'query',
+    '--only-movies',
+    '--uuid-from-file',
+    `"${MATCHING_VIDEOS_UUIDS}"`,
+    '--add-to-album',
+    '"Orphaned videos"',
+  ],
 };
 
-function spawnCommand(command, args) {
+function spawnCommand(requestedCommand, args) {
   return new Promise((resolve, reject) => {
     let output = '';
-    const process = spawn(command, args);
 
-    process.stdout.on('data', (data) => {
+    console.log('📟 Running command:', requestedCommand, args.join(' '));
+    const command = spawn(requestedCommand, args);
+
+    command.stdout.on('data', (data) => {
       output += data;
     });
 
-    process.stderr.on('data', (data) => {
-      console.error(data.toString());
+    command.stderr.on('data', (data) => {
+      // console.error(data.toString());
+      // This is a bit of a hack to get the output of the command
+      // to be overwritten on the same line. That way it is a little tidier
+      process.stdout.write('\r\x1b[K');
+      process.stdout.write(`\r${data.toString().trim()}`);
     });
 
-    process.on('close', (code) => {
+    command.on('close', (code) => {
       if (code === 0) {
         resolve(output);
       } else {
         reject(new Error(`Command failed with code ${code}`));
       }
-    });
-
-    // This is a bit of a hack to get the output of the command
-    // to be overwritten on the same line. That way it is a little tidier
-    command.stdout.on('data', (data) => {
-      process.stdout.write(`\r${data.toString().trim()}   `);
     });
   });
 }
@@ -181,35 +190,61 @@ async function main() {
 
     console.log('🔎 Finding matching videos and photos...');
 
-    const matchingVideos = videoMetadata.filter((video) => {
-      return photoMetadata.some((photo) => {
-        // Parse dates to YYYY-MM-DD format for comparison
-        const photoDate = photo.date.split('T')[0];
-        const videoDate = video.date.split('T')[0];
+    // try to load the UUIDs file
 
-        // Strip extensions and compare filenames
-        const photoFilename = stripExtension(photo.original_filename);
-        const videoFilename = stripExtension(video.original_filename);
+    try {
+      fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
 
-        return photoDate === videoDate && photoFilename === videoFilename;
+      console.log('✅ Matching videos UUIDs already generated');
+    } catch {
+      console.log('❌ No matching videos uuids file found, creating...');
+
+      process.stdout.write(`Searching... 0%\r`);
+
+      const matchingVideos = videoMetadata.filter((video, index) => {
+        const percentComplete = Math.min(
+          Math.round((index / photoMetadata.length) * 100 * 10) / 10,
+          99.9
+        );
+
+        process.stdout.write(`\rSearching... ${percentComplete}%      \r`);
+
+        return photoMetadata.some((photo) => {
+          // Parse dates to YYYY-MM-DD format for comparison
+          const photoDate = photo.date.split('T')[0];
+          const videoDate = video.date.split('T')[0];
+
+          // Strip extensions and compare filenames
+          const photoFilename = stripExtension(photo.original_filename);
+          const videoFilename = stripExtension(video.original_filename);
+
+          return photoDate === videoDate && photoFilename === videoFilename;
+        });
       });
-    });
 
-    if (matchingVideos.length === 0) {
-      console.log('❌ No matching videos and photos found');
-      process.exit(0);
+      if (matchingVideos.length === 0) {
+        console.log('❌ No matching videos and photos found');
+        process.exit(0);
+      }
+
+      console.log(`📹 Found ${matchingVideos.length} matching videos`);
+      console.log(matchingVideos);
+
+      const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
+
+      console.log('⏳ Writing matching videos uuids to file...');
+
+      fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
+
+      console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
     }
 
-    console.log(`📹 Found ${matchingVideos.length} matching videos`);
-    console.log(matchingVideos);
+    console.log('🔎 Adding matching videos to album...');
 
-    const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
+    // const result = await spawnCommand('osxphotos', QUERIES.addVideosToAlbum);
 
-    console.log('⏳ Writing matching videos uuids to file...');
-
-    fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
-
-    console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
+    console.log('✅ Added matching videos to album');
+    console.log(result);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
