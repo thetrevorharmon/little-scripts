@@ -94,6 +94,26 @@ function stripExtension(filename) {
   return filename.replace(/(\(\d+\))*\.[^/.]+$/, '');
 }
 
+const Spinner = new (class {
+  frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  currentFrame = 0;
+
+  constructor() {}
+
+  next() {
+    this.currentFrame++;
+
+    if (this.currentFrame > this.frames.length - 1) {
+      this.currentFrame = 0;
+    }
+  }
+
+  print() {
+    this.next();
+    return this.frames[this.currentFrame];
+  }
+})();
+
 async function main() {
   let videoMetadata, photoMetadata;
 
@@ -199,8 +219,6 @@ async function main() {
 
     console.log('🔎 Finding matching videos and photos...');
 
-    // try to load the UUIDs file
-
     try {
       fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
 
@@ -210,22 +228,22 @@ async function main() {
 
       console.log('✅ Non-matching videos UUIDs already generated');
     } catch {
-      console.log('❌ Missing a videos uuids file, generating...');
+      console.log('❌ Missing a videos uuids file');
+      console.log(`⏳ Processing ${videoMetadata.length} videos...`);
 
-      process.stdout.write(`🔎 Matching videos to photos... 0%\r`);
+      process.stdout.write(
+        `⏳ Matching videos to photos... ${Spinner.print()}\r`
+      );
 
       const matchingVideos = [];
       const nonMatchingVideos = [];
 
-      videoMetadata.forEach((video, index) => {
-        const percentComplete = Math.min(
-          Math.round((index / photoMetadata.length) * 100 * 10) / 10,
-          99.9
-        );
-
-        process.stdout.write(
-          `\r🔎 Matching videos to photos... ${percentComplete}%      \r`
-        );
+      for (const video of videoMetadata) {
+        if (videoMetadata.indexOf(video) % 5 === 0) {
+          process.stdout.write(
+            `\r⏳ Matching videos to photos... ${Spinner.print()}\r`
+          );
+        }
 
         const hasMatch = photoMetadata.some((photo) => {
           // Parse dates to YYYY-MM-DD format for comparison
@@ -244,7 +262,7 @@ async function main() {
         } else {
           nonMatchingVideos.push(video);
         }
-      });
+      }
 
       console.log(
         `📹 Found ${matchingVideos.length} matching videos, ${nonMatchingVideos.length} non-matching videos`
@@ -275,13 +293,13 @@ async function main() {
 
     await spawnCommand('osxphotos', QUERIES.addMatchingVideosToAlbum);
 
-    console.log('✅ Added matching videos to album');
+    console.log('\n✅ Added matching videos to album');
 
     console.log('🔎 Adding non-matching videos to album...');
 
     await spawnCommand('osxphotos', QUERIES.addNonMatchingVideosToAlbum);
 
-    console.log('✅ Added non-matching videos to album');
+    console.log('\n✅ Added non-matching videos to album');
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
