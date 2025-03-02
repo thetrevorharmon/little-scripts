@@ -13,7 +13,7 @@ const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
 // --uuid-from-file <FILE>
 // Search for photos with UUID(s) loaded from FILE. Format is a single UUID per line. Lines preceded with # are ignored. If FILE is ‘-’, read UUIDs from stdin.
 
-// The sizes here are a bit arbitrary, they might need to be adjusted according
+// The sizes here are a bit arbitrary, they might need to be adjusted accordingly
 const QUERIES = {
   // List all of the videos that are 7mb or smaller that were taken after November 1st, 2016
   videoMetadata: [
@@ -26,13 +26,13 @@ const QUERIES = {
     DATE_OF_LIVE_PHOTOS_START,
     '--json',
   ],
-  // List all of the photos that are 15mb or smaller that were taken after November 1st, 2016
+  // List all of the photos that are 6mb or smaller that were taken after November 1st, 2016
   photoMetadata: [
     'query',
     '--only-photos',
     '--max-size',
-    // 15mb in bytes
-    '15728640',
+    // 6mb in bytes
+    '6291456',
     '--from-date',
     DATE_OF_LIVE_PHOTOS_START,
     '--json',
