@@ -114,9 +114,7 @@ const Spinner = new (class {
   }
 })();
 
-async function main() {
-  let videoMetadata, photoMetadata;
-
+async function ensureCacheDirectoryExists() {
   console.log('⏳ Ensuring cache directory exists...');
   try {
     fs.mkdirSync(CACHE_DIRECTORY, { recursive: true });
@@ -130,176 +128,165 @@ async function main() {
       throw error;
     }
   }
+}
+
+async function loadVideoMetadata() {
+  console.log('🔎 Looking for cached videos metadata...');
 
   try {
-    console.log('🔎 Looking for cached videos metadata...');
+    const rawVideoMetadata = fs.readFileSync(RAW_VIDEOS_METADATA, 'utf8');
+    const videoMetadata = JSON.parse(rawVideoMetadata);
+    console.log('✅ Loaded video metadata');
+    return videoMetadata;
+  } catch {
+    console.log('❌ No cached video metadata found, querying...');
 
-    try {
-      rawVideoMetadata = fs.readFileSync(RAW_VIDEOS_METADATA, 'utf8');
-      videoMetadata = JSON.parse(rawVideoMetadata);
+    const result = await spawnCommand('osxphotos', QUERIES.videoMetadata);
+    console.log('📹 Queried video metadata');
 
-      console.log('✅ Loaded video metadata');
-    } catch {
-      console.log('❌ No cached video metadata found, querying...');
+    fs.writeFileSync(RAW_VIDEOS_METADATA, result);
+    console.log(`📁 Wrote results to ${RAW_VIDEOS_METADATA}`);
 
-      const result = await spawnCommand('osxphotos', QUERIES.videoMetadata);
+    const videoMetadata = JSON.parse(result);
+    console.log('✅ Loaded video metadata');
+    return videoMetadata;
+  }
+}
 
-      console.log('📹 Queried video metadata');
+async function loadPhotoMetadata() {
+  console.log('🔎 Looking for cached photos metadata...');
 
-      fs.writeFileSync(RAW_VIDEOS_METADATA, result);
+  try {
+    const rawPhotoMetadata = fs.readFileSync(RAW_PHOTOS_METADATA, 'utf8');
+    const photoMetadata = JSON.parse(rawPhotoMetadata);
+    console.log('✅ Loaded photo metadata');
+    return photoMetadata;
+  } catch {
+    console.log('❌ No cached photo metadata found, querying...');
 
-      console.log(`📁 Wrote results to ${RAW_VIDEOS_METADATA}`);
+    const result = await spawnCommand('osxphotos', QUERIES.photoMetadata);
+    console.log('📸 Queried photo metadata');
 
-      videoMetadata = JSON.parse(result);
+    fs.writeFileSync(RAW_PHOTOS_METADATA, result);
+    console.log(`📁 Wrote results to ${RAW_PHOTOS_METADATA}`);
 
-      console.log('✅ Loaded video metadata');
-    }
+    const photoMetadata = JSON.parse(result);
+    console.log('✅ Loaded photo metadata');
+    return photoMetadata;
+  }
+}
 
-    console.log('🔎 Looking for cached photos metadata...');
+function simplifyMetadata(metadata, type) {
+  if ('exif_info' in metadata[0]) {
+    console.log(`⏳ Simplifying ${type} metadata...`);
 
-    try {
-      rawPhotoMetadata = fs.readFileSync(RAW_PHOTOS_METADATA, 'utf8');
+    const simplified = metadata.map((item) => ({
+      uuid: item.uuid,
+      date: item.date,
+      original_filename: item.original_filename,
+      filename: item.filename,
+      type,
+    }));
 
-      photoMetadata = JSON.parse(rawPhotoMetadata);
+    const outputFile =
+      type === 'video' ? RAW_VIDEOS_METADATA : RAW_PHOTOS_METADATA;
+    fs.writeFileSync(outputFile, JSON.stringify(simplified, null, 2));
+    console.log(`✅ Wrote results to ${outputFile}`);
 
-      console.log('✅ Loaded photo metadata');
-    } catch {
-      console.log('❌ No cached photo metadata found, querying...');
+    return simplified;
+  }
 
-      const result = await spawnCommand('osxphotos', QUERIES.photoMetadata);
+  return metadata;
+}
 
-      console.log('📸 Queried photo metadata');
+async function findMatchingVideos(videoMetadata, photoMetadata) {
+  console.log('🔎 Finding matching videos and photos...');
 
-      fs.writeFileSync(RAW_PHOTOS_METADATA, result);
+  try {
+    fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
+    console.log('✅ Matching videos UUIDs already generated');
 
-      console.log(`📁 Wrote results to ${RAW_PHOTOS_METADATA}`);
+    fs.readFileSync(NON_MATCHING_VIDEOS_UUIDS, 'utf8');
+    console.log('✅ Non-matching videos UUIDs already generated');
+  } catch {
+    console.log('❌ Missing a videos uuids file');
+    console.log(`⏳ Processing ${videoMetadata.length} videos...`);
 
-      photoMetadata = JSON.parse(result);
+    process.stdout.write(
+      `⏳ Matching videos to photos... ${Spinner.print()}\r`
+    );
 
-      console.log('✅ Loaded photo metadata');
-    }
+    const matchingVideos = [];
+    const nonMatchingVideos = [];
 
-    if ('exif_info' in videoMetadata[0]) {
-      console.log('⏳ Simplifying video metadata...');
-
-      videoMetadata = videoMetadata.map((video) => ({
-        uuid: video.uuid,
-        date: video.date,
-        original_filename: video.original_filename,
-        filename: video.filename,
-        type: 'video',
-      }));
-
-      fs.writeFileSync(
-        RAW_VIDEOS_METADATA,
-        JSON.stringify(videoMetadata, null, 2)
-      );
-
-      console.log(`✅ Wrote results to ${RAW_VIDEOS_METADATA}`);
-    }
-
-    if ('exif_info' in photoMetadata[0]) {
-      console.log('⏳ Simplifying photo metadata...');
-
-      photoMetadata = photoMetadata.map((photo) => ({
-        uuid: photo.uuid,
-        date: photo.date,
-        original_filename: photo.original_filename,
-        filename: photo.filename,
-        type: 'photo',
-      }));
-
-      fs.writeFileSync(
-        RAW_PHOTOS_METADATA,
-        JSON.stringify(photoMetadata, null, 2)
-      );
-
-      console.log(`✅ Wrote results to ${RAW_PHOTOS_METADATA}`);
-    }
-
-    console.log('🔎 Finding matching videos and photos...');
-
-    try {
-      fs.readFileSync(MATCHING_VIDEOS_UUIDS, 'utf8');
-
-      console.log('✅ Matching videos UUIDs already generated');
-
-      fs.readFileSync(NON_MATCHING_VIDEOS_UUIDS, 'utf8');
-
-      console.log('✅ Non-matching videos UUIDs already generated');
-    } catch {
-      console.log('❌ Missing a videos uuids file');
-      console.log(`⏳ Processing ${videoMetadata.length} videos...`);
-
-      process.stdout.write(
-        `⏳ Matching videos to photos... ${Spinner.print()}\r`
-      );
-
-      const matchingVideos = [];
-      const nonMatchingVideos = [];
-
-      for (const video of videoMetadata) {
-        if (videoMetadata.indexOf(video) % 5 === 0) {
-          process.stdout.write(
-            `\r⏳ Matching videos to photos... ${Spinner.print()}\r`
-          );
-        }
-
-        const hasMatch = photoMetadata.some((photo) => {
-          // Parse dates to YYYY-MM-DD format for comparison
-          const photoDate = photo.date.split('T')[0];
-          const videoDate = video.date.split('T')[0];
-
-          // Strip extensions and compare filenames
-          const photoFilename = stripExtension(photo.original_filename);
-          const videoFilename = stripExtension(video.original_filename);
-
-          return photoDate === videoDate && photoFilename === videoFilename;
-        });
-
-        if (hasMatch) {
-          matchingVideos.push(video);
-        } else {
-          nonMatchingVideos.push(video);
-        }
+    for (const video of videoMetadata) {
+      if (videoMetadata.indexOf(video) % 5 === 0) {
+        process.stdout.write(
+          `\r⏳ Matching videos to photos... ${Spinner.print()}\r`
+        );
       }
 
-      console.log(
-        `📹 Found ${matchingVideos.length} matching videos, ${nonMatchingVideos.length} non-matching videos`
-      );
+      const hasMatch = photoMetadata.some((photo) => {
+        // Parse dates to YYYY-MM-DD format for comparison
+        const photoDate = photo.date.split('T')[0];
+        const videoDate = video.date.split('T')[0];
 
-      const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
-      const nonMatchingVideosUuids = nonMatchingVideos.map(
-        (video) => video.uuid
-      );
+        // Strip extensions and compare filenames
+        const photoFilename = stripExtension(photo.original_filename);
+        const videoFilename = stripExtension(video.original_filename);
 
-      console.log('⏳ Writing matching videos uuids to file...');
+        return photoDate === videoDate && photoFilename === videoFilename;
+      });
 
-      fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
-
-      console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
-
-      console.log('⏳ Writing non-matching videos uuids to file...');
-
-      fs.writeFileSync(
-        NON_MATCHING_VIDEOS_UUIDS,
-        nonMatchingVideosUuids.join('\n')
-      );
-
-      console.log(`✅ Wrote results to ${NON_MATCHING_VIDEOS_UUIDS}`);
+      if (hasMatch) {
+        matchingVideos.push(video);
+      } else {
+        nonMatchingVideos.push(video);
+      }
     }
 
-    console.log('🔎 Adding matching videos to album...');
+    console.log(
+      `📹 Found ${matchingVideos.length} matching videos, ${nonMatchingVideos.length} non-matching videos`
+    );
 
-    await spawnCommand('osxphotos', QUERIES.addMatchingVideosToAlbum);
+    const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
+    const nonMatchingVideosUuids = nonMatchingVideos.map((video) => video.uuid);
 
-    console.log('\n✅ Added matching videos to album');
+    console.log('⏳ Writing matching videos uuids to file...');
+    fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
+    console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
 
-    console.log('🔎 Adding non-matching videos to album...');
+    console.log('⏳ Writing non-matching videos uuids to file...');
+    fs.writeFileSync(
+      NON_MATCHING_VIDEOS_UUIDS,
+      nonMatchingVideosUuids.join('\n')
+    );
+    console.log(`✅ Wrote results to ${NON_MATCHING_VIDEOS_UUIDS}`);
+  }
+}
 
-    await spawnCommand('osxphotos', QUERIES.addNonMatchingVideosToAlbum);
+async function addVideosToAlbums() {
+  console.log('🔎 Adding matching videos to album...');
+  await spawnCommand('osxphotos', QUERIES.addMatchingVideosToAlbum);
+  console.log('\n✅ Added matching videos to album');
 
-    console.log('\n✅ Added non-matching videos to album');
+  console.log('🔎 Adding non-matching videos to album...');
+  await spawnCommand('osxphotos', QUERIES.addNonMatchingVideosToAlbum);
+  console.log('\n✅ Added non-matching videos to album');
+}
+
+async function main() {
+  try {
+    await ensureCacheDirectoryExists();
+
+    let videoMetadata = await loadVideoMetadata();
+    let photoMetadata = await loadPhotoMetadata();
+
+    videoMetadata = simplifyMetadata(videoMetadata, 'video');
+    photoMetadata = simplifyMetadata(photoMetadata, 'photo');
+
+    await findMatchingVideos(videoMetadata, photoMetadata);
+    await addVideosToAlbums();
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
