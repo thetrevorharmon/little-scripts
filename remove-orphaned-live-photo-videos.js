@@ -7,6 +7,7 @@ const CACHE_DIRECTORY =
   '.cache/little-scripts/remove-orphaned-live-photo-videos';
 const RAW_VIDEOS_METADATA = `${CACHE_DIRECTORY}/videos.txt`;
 const RAW_PHOTOS_METADATA = `${CACHE_DIRECTORY}/photos.txt`;
+const MATCHING_VIDEOS_UUIDS = `${CACHE_DIRECTORY}/matching-videos-uuids.txt`;
 
 // osxphotos query --only-movies --min-size 200MB --add-to-album "Big Videos"
 
@@ -72,7 +73,7 @@ function stripExtension(filename) {
 async function main() {
   let videoMetadata, photoMetadata;
 
-  console.log('🔎 Ensuring cache directory exists...');
+  console.log('⏳ Ensuring cache directory exists...');
   try {
     fs.mkdirSync(CACHE_DIRECTORY, { recursive: true });
     console.log('✅ Cache directory created');
@@ -148,10 +149,19 @@ async function main() {
 
     if (matchingVideos.length === 0) {
       console.log('❌ No matching videos and photos found');
-    } else {
-      console.log(`📹 Found ${matchingVideos.length} matching videos`);
-      console.log(matchingVideos);
+      process.exit(0);
     }
+
+    console.log(`📹 Found ${matchingVideos.length} matching videos`);
+    console.log(matchingVideos);
+
+    const matchingVideosUuids = matchingVideos.map((video) => video.uuid);
+
+    console.log('⏳ Writing matching videos uuids to file...');
+
+    fs.writeFileSync(MATCHING_VIDEOS_UUIDS, matchingVideosUuids.join('\n'));
+
+    console.log(`✅ Wrote results to ${MATCHING_VIDEOS_UUIDS}`);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
