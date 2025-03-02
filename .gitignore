@@ -137,4 +137,3 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-_scratch/*

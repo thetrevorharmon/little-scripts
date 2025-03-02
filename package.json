@@ -6,7 +6,7 @@
   "author": "Trevor Harmon <thetrevorharmon@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "photo-query": "node photo-query.js",
+    "remove-orphaned-live-photo-videos": "node remove-orphaned-live-photo-videos.js",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
