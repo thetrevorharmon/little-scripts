@@ -141,15 +141,57 @@ async function main() {
       console.log('✅ Loaded photo metadata');
     }
 
+    if ('exif_info' in videoMetadata[0]) {
+      console.log('⏳ Simplifying video metadata...');
+
+      videoMetadata = videoMetadata.map((video) => ({
+        uuid: video.uuid,
+        date: video.date,
+        original_filename: video.original_filename,
+        filename: video.filename,
+        type: 'video',
+      }));
+
+      fs.writeFileSync(
+        RAW_VIDEOS_METADATA,
+        JSON.stringify(videoMetadata, null, 2)
+      );
+
+      console.log(`✅ Wrote results to ${RAW_VIDEOS_METADATA}`);
+    }
+
+    if ('exif_info' in photoMetadata[0]) {
+      console.log('⏳ Simplifying photo metadata...');
+
+      photoMetadata = photoMetadata.map((photo) => ({
+        uuid: photo.uuid,
+        date: photo.date,
+        original_filename: photo.original_filename,
+        filename: photo.filename,
+        type: 'photo',
+      }));
+
+      fs.writeFileSync(
+        RAW_PHOTOS_METADATA,
+        JSON.stringify(photoMetadata, null, 2)
+      );
+
+      console.log(`✅ Wrote results to ${RAW_PHOTOS_METADATA}`);
+    }
+
     console.log('🔎 Finding matching videos and photos...');
 
     const matchingVideos = videoMetadata.filter((video) => {
       return photoMetadata.some((photo) => {
-        return (
-          photo.date === video.date &&
-          stripExtension(photo.original_filename) ===
-            stripExtension(video.original_filename)
-        );
+        // Parse dates to YYYY-MM-DD format for comparison
+        const photoDate = photo.date.split('T')[0];
+        const videoDate = video.date.split('T')[0];
+
+        // Strip extensions and compare filenames
+        const photoFilename = stripExtension(photo.original_filename);
+        const videoFilename = stripExtension(video.original_filename);
+
+        return photoDate === videoDate && photoFilename === videoFilename;
       });
     });
 
