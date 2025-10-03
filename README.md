@@ -2,7 +2,4 @@
 
 ## remove-orphaned-live-photo-videos
 
-Dependencies:
-
-- `pipx` (install with `brew install pipx`)
-- `osxphotos` (install with `pipx install osxphotos`)
+This depends on [`osxphotos`](https://github.com/RhetTbull/osxphotos). Included in the repo is a binary version, but if that does not work/has problems, you can install it with `uv` (it runs on python).

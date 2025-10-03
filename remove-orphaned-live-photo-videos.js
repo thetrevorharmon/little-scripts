@@ -15,6 +15,8 @@ const ALBUMS = {
   NON_MATCHING_VIDEOS: 'Small videos that might be orphaned',
 };
 
+const OSXPHOTOS_EXE = './osxphotos';
+
 // The sizes here are a bit arbitrary, they might need to be adjusted accordingly
 const QUERIES = {
   // List all of the videos that are 7mb or smaller that were taken after November 1st, 2016
@@ -140,7 +142,7 @@ async function loadVideoMetadata() {
   } catch {
     console.log('❌ No cached video metadata found, querying...');
 
-    const result = await spawnCommand('osxphotos', QUERIES.videoMetadata);
+    const result = await spawnCommand(OSXPHOTOS_EXE, QUERIES.videoMetadata);
     console.log('📹 Queried video metadata');
 
     fs.writeFileSync(RAW_VIDEOS_METADATA_PATH, result);
@@ -163,7 +165,7 @@ async function loadPhotoMetadata() {
   } catch {
     console.log('❌ No cached photo metadata found, querying...');
 
-    const result = await spawnCommand('osxphotos', QUERIES.photoMetadata);
+    const result = await spawnCommand(OSXPHOTOS_EXE, QUERIES.photoMetadata);
     console.log('📸 Queried photo metadata');
 
     fs.writeFileSync(RAW_PHOTOS_METADATA_PATH, result);
@@ -270,11 +272,11 @@ async function findMatchingVideos(videoMetadata, photoMetadata) {
 
 async function addVideosToAlbums() {
   console.log('🔎 Adding matching videos to album...');
-  await spawnCommand('osxphotos', QUERIES.addMatchingVideosToAlbum);
+  await spawnCommand(OSXPHOTOS_EXE, QUERIES.addMatchingVideosToAlbum);
   console.log('\n✅ Added matching videos to album');
 
   console.log('🔎 Adding non-matching videos to album...');
-  await spawnCommand('osxphotos', QUERIES.addNonMatchingVideosToAlbum);
+  await spawnCommand(OSXPHOTOS_EXE, QUERIES.addNonMatchingVideosToAlbum);
   console.log('\n✅ Added non-matching videos to album');
 }
 
